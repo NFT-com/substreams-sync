@@ -1,3 +1,4 @@
+mod abi;
 mod block_timestamp;
 mod pb;
 
@@ -9,6 +10,17 @@ use substreams::store::{
 use substreams::Hex;
 use substreams_database_change::pb::database::{table_change::Operation, DatabaseChanges};
 use substreams_ethereum::pb as ethpb;
+
+use hex_literal::hex;
+use pb::erc721;
+use substreams::prelude::*;
+use substreams::{log, store::StoreAddInt64, Hex};
+use substreams_ethereum::{pb::eth::v2 as eth, NULL_ADDRESS};
+
+// Bored Ape Club Contract
+const TRACKED_CONTRACT: [u8; 20] = hex!("bc4ca0eda7647a8ab7c2061c2e118a18a936f13d");
+
+substreams_ethereum::init!();
 
 #[substreams::handlers::store]
 fn store_block_meta_start(blk: ethpb::eth::v2::Block, s: StoreSetIfNotExistsProto<BlockMeta>) {
