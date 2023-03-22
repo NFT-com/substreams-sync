@@ -5,7 +5,7 @@ package:
 
 protobuf:
   files:
-    - block_meta.proto
+    - erc721.proto
   importPaths:
     - ./proto
 
