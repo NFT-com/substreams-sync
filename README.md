@@ -64,3 +64,7 @@ psql://<user>:<password>@<host>/<dbname>[?<options>]
 Where `<options>` is URL query parameters in `<key>=<value>` format, multiple options are separated by `&` signs. Supported options can be seen [on libpq official documentation](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS). The options `<user>`, `<password>`, `<host>` and `<dbname>` should **not** be passed in `<options>` as they are automatically extracted from the DSN URL.
 
 Moreover, the `schema` option key can be used to select a particular schema within the `<dbname>` database.
+
+### Authentication
+export STREAMINGFAST_KEY=${INSERT_KEY}
+export SUBSTREAMS_API_TOKEN=$(curl https://auth.dfuse.io/v1/auth/issue -s --data-binary '{"api_key":"'$STREAMINGFAST_KEY'"}' | jq -r .token)

@@ -109,7 +109,7 @@ fn push_create(
     value: erc721::Transfer,
 ) {
     changes
-        .push_change("erc721", key, ordinal, Operation::Create)
+        .push_change("nft_transfer", key, ordinal, Operation::Create)
         .change("at", (None, timestamp))
         .change("number", (None, value.number))
         .change("from", (None, value.from))
@@ -129,7 +129,7 @@ fn push_update(
     new_value: erc721::Transfer,
 ) {
     changes
-        .push_change("erc721", key, ordinal, Operation::Update)
+        .push_change("nft_transfer", key, ordinal, Operation::Update)
         .change("number", (old_value.number, new_value.number))
         .change("from", (old_value.from, new_value.from))
         .change("to", (Hex(old_value.to), Hex(new_value.to)))

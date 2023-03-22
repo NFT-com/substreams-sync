@@ -15,14 +15,14 @@ imports:
 binaries:
   default:
     type: wasm/rust-v1
-    file: target/wasm32-unknown-unknown/release/substreams_postgresql_sink_nftLoader.wasm
+    file: target/wasm32-unknown-unknown/release/substreams_postgresql_sink_tutorial.wasm
 
 modules:
   - name: store_transfers
     kind: store
     initialBlock: 12287507
     updatePolicy: set_if_not_exists
-    valueType: int64
+    valueType: proto:eth.erc721.v1.Transfer
     inputs:
       - source: sf.ethereum.type.v2.Block
 
