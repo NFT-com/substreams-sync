@@ -13,7 +13,8 @@ message Transfer {
   bytes from = 2;
   bytes to = 3;
   uint64 token_id = 4;
-  bytes tx_hash = 5;
-  uint64 ordinal = 6;
-  google.protobuf.Timestamp timestamp = 7;
+  bytes contract = 5;
+  bytes tx_hash = 6;
+  uint64 ordinal = 7;
+  google.protobuf.Timestamp timestamp = 8;
 }

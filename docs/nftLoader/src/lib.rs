@@ -34,6 +34,7 @@ fn transform_block_to_erc721_transfers(blk: ethpb::eth::v2::Block) -> (BlockTime
                 number: blk.number,
                 from: transfer.from,
                 to: transfer.to,
+                contract: log.address().to_vec(), // TODO: verify this is the correct method
                 token_id: transfer.token_id.to_u64(),
                 tx_hash: log.receipt.transaction.hash.clone(),
                 ordinal: log.block_index() as u64,
@@ -113,6 +114,7 @@ fn push_create(
         .change("number", (None, value.number))
         .change("from", (None, value.from))
         .change("to", (None, value.to))
+        .change("contract", (None, value.contract))
         .change("token_id", (None, value.token_id))
         .change("tx_hash", (None, Hex(value.tx_hash)))
         .change("ordinal", (None, value.ordinal))
@@ -131,6 +133,7 @@ fn push_update(
         .change("number", (old_value.number, new_value.number))
         .change("from", (old_value.from, new_value.from))
         .change("to", (Hex(old_value.to), Hex(new_value.to)))
+        .change("contract", (old_value.contract, new_value.contract))
         .change(
             "token_id",
             (old_value.token_id, new_value.token_id),

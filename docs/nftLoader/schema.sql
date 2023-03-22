@@ -1,11 +1,13 @@
-create table nft_transfer
+create table erc721
 (
-    id          text not null constraint nft_transfer_pk primary key,
+    id          text not null constraint erc721_pk primary key,
+    number      text,
     from        text,
     to          text,
+    token_id    text,
+    tx_hash     text,
+    ordinal     text,
     contract    text,
-    tokenId     text,
-    hash        text,
     timestamp   text
 );
 
@@ -13,7 +15,7 @@ create table nft
 (
     id          text not null constraint nft_transfer_pk primary key,
     contract    text,
-    tokenId     text,
+    token_id    text,
     owner       text,
     tokenUri    text,
     metadata    text,
