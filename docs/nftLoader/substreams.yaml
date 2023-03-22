@@ -9,8 +9,8 @@ protobuf:
   importPaths:
     - ./proto
 
-# imports:
-#   database_change: https://github.com/streamingfast/substreams-database-change/releases/download/v0.1.0/substreams-database-change-v0.1.0.spkg
+imports:
+  database_change: https://github.com/streamingfast/substreams-database-change/releases/download/v0.1.0/substreams-database-change-v0.1.0.spkg
 
 binaries:
   default:
@@ -18,12 +18,6 @@ binaries:
     file: target/wasm32-unknown-unknown/release/substreams_postgresql_sink_nftLoader.wasm
 
 modules:
-  # - name: store_block_meta_start
-  #   kind: store
-  #   updatePolicy: set_if_not_exists
-  #   valueType: proto:eth.block_meta.v1.BlockMeta
-  #   inputs:
-  #     - source: sf.ethereum.type.v2.Block
   - name: store_transfers
     kind: store
     initialBlock: 12287507
@@ -31,15 +25,7 @@ modules:
     valueType: int64
     inputs:
       - source: sf.ethereum.type.v2.Block
-      # - map: map_transfers
 
-  # - name: db_out
-  #   kind: map
-  #   inputs:
-  #     - store: store_block_meta_start
-  #       mode: deltas
-  #   output:
-  #     type: proto:sf.substreams.database.v1.DatabaseChanges
   - name: db_out
     kind: map
     initialBlock: 12287507
@@ -47,5 +33,5 @@ modules:
       - store: store_transfers
         mode: deltas
     output:
-      type: proto:sf.substreams.database.v1.DatabaseChanges # proto:eth.erc721.v1.Transfers
+      type: proto:sf.substreams.database.v1.DatabaseChanges
 

@@ -1,6 +1,6 @@
-create table erc721
+create table erc721_transfers
 (
-    id          text not null constraint erc721_pk primary key,
+    id          text not null constraint erc721_transfers_pk primary key,
     number      text,
     from        text,
     to          text,

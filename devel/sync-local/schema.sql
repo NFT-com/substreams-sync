@@ -1,10 +1,13 @@
-create table block_meta
+create table erc721_transfers
 (
-    id          text not null constraint block_meta_pk primary key,
-    at          text,
-    number      integer,
-    hash        text,
-    parent_hash text,
+    id          text not null constraint erc721_transfers_pk primary key,
+    number      text,
+    from        text,
+    to          text,
+    token_id    text,
+    tx_hash     text,
+    ordinal     text,
+    contract    text,
     timestamp   text
 );
 
