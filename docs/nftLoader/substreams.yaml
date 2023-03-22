@@ -27,10 +27,11 @@ modules:
   - name: store_transfers
     kind: store
     initialBlock: 12287507
-    updatePolicy: add
+    updatePolicy: set_if_not_exists
     valueType: int64
     inputs:
-      - map: map_transfers
+      - source: sf.ethereum.type.v2.Block
+      # - map: map_transfers
 
   # - name: db_out
   #   kind: map
@@ -43,7 +44,7 @@ modules:
     kind: map
     initialBlock: 12287507
     inputs:
-      - source: sf.ethereum.type.v2.Block
+      - store: store_transfers
     output:
       type: proto:eth.erc721.v1.Transfers
 
