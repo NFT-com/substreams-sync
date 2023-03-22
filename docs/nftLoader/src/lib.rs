@@ -48,25 +48,20 @@ fn transform_block_to_erc721_transfers(blk: ethpb::eth::v2::Block) -> (BlockTime
 /// Parses block and saves to store
 #[substreams::handlers::store]
 fn store_transfers(blk: ethpb::eth::v2::Block, s: StoreSetIfNotExistsProto<erc721::Transfer>) {
-    let (_timestamp, erc721_transfers) = transform_block_to_erc721_transfers(blk);
+    let (timestamp, erc721_transfers) = transform_block_to_erc721_transfers(blk);
 
     // for loop over erc721_transfers
     for transfer in erc721_transfers {
         let mut unique_key = String::new();
-        unique_key.push_str(&String::from_utf8_lossy(&transfer.tx_hash));
-        unique_key.push_str(&String::from_utf8_lossy(&transfer.from_address));
-        unique_key.push_str(&String::from_utf8_lossy(&transfer.to_address));
-        unique_key.push_str(&String::from_utf8_lossy(&transfer.token_id));
-        unique_key.push_str(&transfer.block_number.to_string());        
 
         if transfer.from_address != NULL_ADDRESS {
             log::info!("Found a transfer out {}", Hex(&transfer.tx_hash));
-            s.set_if_not_exists(transfer.block_number, unique_key.clone(), &transfer);
+            s.set_if_not_exists(transfer.ordinal, timestamp.start_of_day_key(), &transfer);
         }
 
         if transfer.to_address != NULL_ADDRESS {
             log::info!("Found a transfer in {}", Hex(&transfer.tx_hash));
-            s.set_if_not_exists(transfer.block_number, unique_key.clone(), &transfer);
+            s.set_if_not_exists(transfer.ordinal, timestamp.start_of_day_key(), &transfer);
         }
     }
 }
@@ -91,6 +86,7 @@ fn transform_erc721_transfers_to_database_changes(
             Operation::Create => push_create(
                 changes,
                 &delta.key,
+                BlockTimestamp::from_key(&delta.key),
                 delta.ordinal,
                 delta.new_value,
             ),
@@ -115,6 +111,7 @@ fn push_create(
 ) {
     changes
         .push_change("erc721_transfers", key, ordinal, Operation::Create)
+        .change("at", (None, timestamp))
         .change("block_number", (None, value.block_number))
         .change("from_address", (None, Hex(value.from_address)))
         .change("to_address", (None, Hex(value.to_address)))
