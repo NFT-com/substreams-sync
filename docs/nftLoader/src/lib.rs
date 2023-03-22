@@ -21,7 +21,7 @@ substreams_ethereum::init!();
 
 fn transform_block_to_erc721_transfers(blk: ethpb::eth::v2::Block) -> (BlockTimestamp, Vec<erc721::Transfer>) {
     let timestamp = BlockTimestamp::from_block(&blk);
-    let header = blk.header.unwrap();
+    let header = blk.header.as_ref().unwrap();
 
     (
         timestamp,
@@ -37,7 +37,7 @@ fn transform_block_to_erc721_transfers(blk: ethpb::eth::v2::Block) -> (BlockTime
                 token_id: transfer.token_id.to_u64(),
                 tx_hash: log.receipt.transaction.hash.clone(),
                 ordinal: log.block_index() as u64,
-                timestamp: Some(header.timestamp.unwrap()),
+                timestamp: Some(header.timestamp.as_ref().unwrap().clone()),
             }
         })
         .collect::<Vec<erc721::Transfer>>(), // Collect the results into a Vec
@@ -47,10 +47,10 @@ fn transform_block_to_erc721_transfers(blk: ethpb::eth::v2::Block) -> (BlockTime
 /// Parses block and saves to store
 #[substreams::handlers::store]
 fn store_transfers(blk: ethpb::eth::v2::Block, s: StoreSetIfNotExistsProto<erc721::Transfer>) {
-    let (timestamp, erc721Transfers) = transform_block_to_erc721_transfers(blk);
+    let (timestamp, erc721_transfers) = transform_block_to_erc721_transfers(blk);
 
-    // for loop over erc721Transfers
-    for transfer in erc721Transfers {
+    // for loop over erc721_transfers
+    for transfer in erc721_transfers {
         if transfer.from != NULL_ADDRESS {
             log::info!("Found a transfer out {}", Hex(&transfer.tx_hash));
             s.set_if_not_exists(transfer.number, timestamp.start_of_day_key(), &transfer);
@@ -65,10 +65,10 @@ fn store_transfers(blk: ethpb::eth::v2::Block, s: StoreSetIfNotExistsProto<erc72
 
 #[substreams::handlers::map]
 fn db_out(
-    ercTransferStart: store::Deltas<DeltaProto<erc721::Transfer>>,
+    erc_transfer_start: store::Deltas<DeltaProto<erc721::Transfer>>,
 ) -> Result<DatabaseChanges, substreams::errors::Error> {
     let mut database_changes: DatabaseChanges = Default::default();
-    transform_erc721_transfers_to_database_changes(&mut database_changes, ercTransferStart);
+    transform_erc721_transfers_to_database_changes(&mut database_changes, erc_transfer_start);
     Ok(database_changes)
 }
 
