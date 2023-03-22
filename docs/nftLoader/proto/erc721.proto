@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package eth.erc721.v1;
+
+import "google/protobuf/timestamp.proto";
+
+message Transfers {
+  repeated Transfer transfers = 1;
+}
+
+message Transfer {
+  uint64 number = 1;
+  bytes from = 2;
+  bytes to = 3;
+  uint64 token_id = 4;
+  bytes tx_hash = 5;
+  uint64 ordinal = 6;
+  google.protobuf.Timestamp timestamp = 7;
+}
