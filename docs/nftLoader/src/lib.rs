@@ -31,11 +31,11 @@ fn transform_block_to_erc721_transfers(blk: ethpb::eth::v2::Block) -> (BlockTime
             substreams::log::info!("NFT Transfer seen");
 
             erc721::Transfer {
-                number: blk.number,
-                from: transfer.from,
-                to: transfer.to,
-                contract: log.address().to_vec(), // TODO: verify this is the correct method
-                token_id: transfer.token_id.to_u64(),
+                block_number: blk.number,
+                from_address: transfer.from,
+                to_address: transfer.to,
+                contract_address: log.address().to_vec(), // TODO: verify this is the correct method
+                token_id: transfer.token_id.to_bytes_be().1,
                 tx_hash: log.receipt.transaction.hash.clone(),
                 ordinal: log.block_index() as u64,
                 timestamp: Some(header.timestamp.as_ref().unwrap().clone()),
@@ -48,18 +48,25 @@ fn transform_block_to_erc721_transfers(blk: ethpb::eth::v2::Block) -> (BlockTime
 /// Parses block and saves to store
 #[substreams::handlers::store]
 fn store_transfers(blk: ethpb::eth::v2::Block, s: StoreSetIfNotExistsProto<erc721::Transfer>) {
-    let (timestamp, erc721_transfers) = transform_block_to_erc721_transfers(blk);
+    let (_timestamp, erc721_transfers) = transform_block_to_erc721_transfers(blk);
 
     // for loop over erc721_transfers
     for transfer in erc721_transfers {
-        if transfer.from != NULL_ADDRESS {
+        let mut unique_key = String::new();
+        unique_key.push_str(&String::from_utf8_lossy(&transfer.tx_hash));
+        unique_key.push_str(&String::from_utf8_lossy(&transfer.from_address));
+        unique_key.push_str(&String::from_utf8_lossy(&transfer.to_address));
+        unique_key.push_str(&String::from_utf8_lossy(&transfer.token_id));
+        unique_key.push_str(&transfer.block_number.to_string());        
+
+        if transfer.from_address != NULL_ADDRESS {
             log::info!("Found a transfer out {}", Hex(&transfer.tx_hash));
-            s.set_if_not_exists(transfer.number, timestamp.start_of_day_key(), &transfer);
+            s.set_if_not_exists(transfer.block_number, unique_key.clone(), &transfer);
         }
 
-        if transfer.to != NULL_ADDRESS {
+        if transfer.to_address != NULL_ADDRESS {
             log::info!("Found a transfer in {}", Hex(&transfer.tx_hash));
-            s.set_if_not_exists(transfer.number, timestamp.start_of_day_key(), &transfer);
+            s.set_if_not_exists(transfer.block_number, unique_key.clone(), &transfer);
         }
     }
 }
@@ -84,7 +91,6 @@ fn transform_erc721_transfers_to_database_changes(
             Operation::Create => push_create(
                 changes,
                 &delta.key,
-                BlockTimestamp::from_key(&delta.key),
                 delta.ordinal,
                 delta.new_value,
             ),
@@ -104,18 +110,16 @@ fn transform_erc721_transfers_to_database_changes(
 fn push_create(
     changes: &mut DatabaseChanges,
     key: &str,
-    timestamp: BlockTimestamp,
     ordinal: u64,
     value: erc721::Transfer,
 ) {
     changes
-        .push_change("nft_transfer", key, ordinal, Operation::Create)
-        .change("at", (None, timestamp))
-        .change("number", (None, value.number))
-        .change("from", (None, value.from))
-        .change("to", (None, value.to))
-        .change("contract", (None, value.contract))
-        .change("token_id", (None, value.token_id))
+        .push_change("erc721_transfers", key, ordinal, Operation::Create)
+        .change("block_number", (None, value.block_number))
+        .change("from_address", (None, Hex(value.from_address)))
+        .change("to_address", (None, Hex(value.to_address)))
+        .change("contract_address", (None, Hex(value.contract_address)))
+        .change("token_id", (None, Hex(value.token_id)))
         .change("tx_hash", (None, Hex(value.tx_hash)))
         .change("ordinal", (None, value.ordinal))
         .change("timestamp", (None, value.timestamp.unwrap()));
@@ -129,14 +133,14 @@ fn push_update(
     new_value: erc721::Transfer,
 ) {
     changes
-        .push_change("nft_transfer", key, ordinal, Operation::Update)
-        .change("number", (old_value.number, new_value.number))
-        .change("from", (old_value.from, new_value.from))
-        .change("to", (Hex(old_value.to), Hex(new_value.to)))
-        .change("contract", (old_value.contract, new_value.contract))
+        .push_change("erc721_transfers", key, ordinal, Operation::Update)
+        .change("block_number", (old_value.block_number, new_value.block_number))
+        .change("from_address", (Hex(old_value.from_address), Hex(new_value.from_address)))
+        .change("to_address", (Hex(old_value.to_address), Hex(new_value.to_address)))
+        .change("contract_address", (Hex(old_value.contract_address), Hex(new_value.contract_address)))
         .change(
             "token_id",
-            (old_value.token_id, new_value.token_id),
+            (Hex(old_value.token_id), Hex(new_value.token_id)),
         )
         .change(
             "tx_hash",
