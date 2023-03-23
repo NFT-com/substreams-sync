@@ -3,6 +3,7 @@ mod block_timestamp;
 mod pb;
 
 use self::block_timestamp::BlockTimestamp;
+use rayon::prelude::*; // for parallelizing
 use substreams::store::{
     self, DeltaProto, StoreNew, StoreSetIfNotExists, StoreSetIfNotExistsProto,
 };
@@ -13,9 +14,15 @@ use hex_literal::hex;
 use pb::erc721;
 use substreams::{log, Hex};
 use substreams_ethereum::{NULL_ADDRESS};
+use lazy_static::lazy_static;
 
-// Bored Ape Club Contract
-const TRACKED_CONTRACT: [u8; 20] = hex!("bc4ca0eda7647a8ab7c2061c2e118a18a936f13d");
+lazy_static! {
+    static ref TRACKED_CONTRACTS: Vec<&'static [u8]> = vec![
+        hex!("bc4ca0eda7647a8ab7c2061c2e118a18a936f13d").as_ref(), // Bored Ape Yacht Club (BAYC)
+        hex!("34d85c9cdeb23fa97cb08333b511ac86e1c4e258").as_ref(), // Otherwise
+        hex!("1792a96E5668ad7C167ab804a100ce42395Ce54D").as_ref(), // Moonbirds
+    ];
+}
 
 substreams_ethereum::init!();
 
@@ -23,26 +30,29 @@ fn transform_block_to_erc721_transfers(blk: ethpb::eth::v2::Block) -> (BlockTime
     let timestamp = BlockTimestamp::from_block(&blk);
     let header = blk.header.as_ref().unwrap();
 
-    (
-        timestamp,
-        blk
-        .events::<abi::erc721::events::Transfer>(&[&TRACKED_CONTRACT])
-        .map(|(transfer, log)| {
-            substreams::log::info!("NFT Transfer seen");
+    let transfers: Vec<erc721::Transfer> = (&*TRACKED_CONTRACTS)
+        .par_iter() // Process events in parallel
+        .flat_map(|&contract_address| {
+            blk.events::<abi::erc721::events::Transfer>(&[contract_address]) // Pass a slice of contract addresses
+                .map(|(transfer, log)| {
+                    substreams::log::info!("NFT Transfer seen");
 
-            erc721::Transfer {
-                block_number: blk.number,
-                from_address: transfer.from,
-                to_address: transfer.to,
-                contract_address: log.address().to_vec(), // TODO: verify this is the correct method
-                token_id: transfer.token_id.to_bytes_be().1,
-                tx_hash: log.receipt.transaction.hash.clone(),
-                ordinal: log.block_index() as u64,
-                timestamp: Some(header.timestamp.as_ref().unwrap().clone()),
-            }
+                    erc721::Transfer {
+                        block_number: blk.number,
+                        from_address: transfer.from,
+                        to_address: transfer.to,
+                        contract_address: log.address().to_vec(),
+                        token_id: transfer.token_id.to_bytes_be().1,
+                        tx_hash: log.receipt.transaction.hash.clone(),
+                        ordinal: log.block_index() as u64,
+                        timestamp: Some(header.timestamp.as_ref().unwrap().clone()),
+                    }
+                })
+                .collect::<Vec<erc721::Transfer>>()
         })
-        .collect::<Vec<erc721::Transfer>>(), // Collect the results into a Vec
-    )
+        .collect();
+
+    (timestamp, transfers)
 }
 
 /// Parses block and saves to store
