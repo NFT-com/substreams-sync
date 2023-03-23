@@ -52,11 +52,13 @@ fn store_transfers(blk: ethpb::eth::v2::Block, s: StoreSetIfNotExistsProto<erc72
 
     let unique_key = |transfer: &erc721::Transfer| {
         format!(
-            "{}-{}-{}-{}",
+            "{}-{}-{}-{}-{}-{}",
             Hex(&transfer.contract_address),
             Hex(&transfer.token_id),
             Hex(&transfer.from_address),
             Hex(&transfer.to_address),
+            Hex(&transfer.tx_hash),
+            &transfer.ordinal
         )
     };
 
