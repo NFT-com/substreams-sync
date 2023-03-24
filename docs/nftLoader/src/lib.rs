@@ -325,12 +325,15 @@ fn push_create(
     value: transfers::Transfer,
 ) {
     changes
-        .push_change("erc721_transfers", key, ordinal, Operation::Create)
+        .push_change("transfers", key, ordinal, Operation::Create)
+        .change("schema", (None, value.schema))
         .change("block_number", (None, value.block_number))
         .change("from_address", (None, Hex(value.from_address)))
         .change("to_address", (None, Hex(value.to_address)))
-        .change("contract_address", (None, Hex(value.contract_address)))
+        .change("operator", (None, Hex(value.operator)))
+        .change("quantity", (None, value.quantity))
         .change("token_id", (None, Hex(value.token_id)))
+        .change("contract_address", (None, Hex(value.contract_address)))
         .change("tx_hash", (None, Hex(value.tx_hash)))
         .change("ordinal", (None, value.ordinal))
         .change("timestamp", (None, value.timestamp.unwrap()));
@@ -344,15 +347,18 @@ fn push_update(
     new_value: transfers::Transfer,
 ) {
     changes
-        .push_change("erc721_transfers", key, ordinal, Operation::Update)
+        .push_change("transfers", key, ordinal, Operation::Update)
+        .change("schema", (old_value.schema, new_value.schema))
         .change("block_number", (old_value.block_number, new_value.block_number))
         .change("from_address", (Hex(old_value.from_address), Hex(new_value.from_address)))
         .change("to_address", (Hex(old_value.to_address), Hex(new_value.to_address)))
-        .change("contract_address", (Hex(old_value.contract_address), Hex(new_value.contract_address)))
+        .change("operator", (Hex(old_value.operator), Hex(new_value.operator)))
+        .change("quantity", (old_value.quantity, new_value.quantity))
         .change(
             "token_id",
             (Hex(old_value.token_id), Hex(new_value.token_id)),
         )
+        .change("contract_address", (Hex(old_value.contract_address), Hex(new_value.contract_address)))
         .change(
             "tx_hash",
             (Hex(old_value.tx_hash), Hex(new_value.tx_hash)),

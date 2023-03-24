@@ -16,7 +16,7 @@ create table transfers
     timestamp           text
 );
 
-create table nft
+create table nfts
 (
     id          text not null constraint nft_transfer_pk primary key,
     contract    text,
@@ -26,7 +26,7 @@ create table nft
     metadata    text
 );
 
-create table contract
+create table contracts
 (
     id          text not null constraint contract_pk primary key,
     contract    text,

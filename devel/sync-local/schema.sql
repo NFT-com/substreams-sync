@@ -1,16 +1,37 @@
-create table erc721_transfers
+create table transfers
 (
-    id                  text not null constraint erc721_transfers_pk primary key,
+    id                  text not null constraint transfers_pk primary key,
     version             integer,
     at                  text,
+    schema              text,
     block_number        text,
     from_address        text,
     to_address          text,
+    operator            text,
+    quantity            text,
     token_id            text,
+    contract_address    text,
     tx_hash             text,
     ordinal             text,
-    contract_address    text,
     timestamp           text
+);
+
+create table nfts
+(
+    id          text not null constraint nft_transfer_pk primary key,
+    contract    text,
+    token_id    text,
+    owner       text,
+    tokenUri    text,
+    metadata    text
+);
+
+create table contracts
+(
+    id          text not null constraint contract_pk primary key,
+    contract    text,
+    base_uri    text,
+    deployer    text
 );
 
 create table cursors
