@@ -23,37 +23,6 @@ use abi::erc721::events::Transfer as ERC721TransferEvent;
 
 substreams_ethereum::init!();
 
- // let timestamp = BlockTimestamp::from_block(&blk);
-    // let header = blk.header.as_ref().unwrap();
-
-    // let transfers: Vec<transfers::Transfer> = (&*TRACKED_CONTRACTS)
-    //     .iter() // non parallel execution primarily due to trying parallel and getting this error
-    //     // substreams encountered an error
-    //     // {"error": "receive stream next message: rpc error: code =
-    //     // Internal desc = error building pipeline: failed setup request: parallel processing run:
-    //     // scheduler run: process job result for target \"store_transfers\": worker ended in error: receiving stream resp:
-    //     // rpc error: code = Internal desc = panic at block #14894146 (980beeda46767b72194cd169cbcd0cb4abbe308d2048571f4068f4c498f2e0e8):
-    //     // cannot Set or Del a value on a state.Builder with an ordinal lower than the previous"}
-    //     // @Gavin: seems like the ordinals in parallel don't work very well as they can be lower than the previous ordinal in a parallel setup
-    //     .flat_map(|&contract_address| {
-    //         blk.events::<abi::erc721::events::Transfer>(&[contract_address]) // Pass a slice of contract addresses
-    //             .map(|(transfer, log)| {
-    //                 substreams::log::info!("NFT Transfer seen");
-
-    //                 transfers::Transfer {
-    //                     block_number: blk.number,
-    //                     from_address: transfer.from,
-    //                     to_address: transfer.to,
-    //                     contract_address: log.address().to_vec(),
-    //                     token_id: transfer.token_id.to_bytes_be().1,
-    //                     tx_hash: log.receipt.transaction.hash.clone(),
-    //                     ordinal: log.block_index() as u64,
-    //                     timestamp: Some(header.timestamp.as_ref().unwrap().clone()),
-    //                 }
-    //             })
-    //             .collect::<Vec<transfers::Transfer>>()
-    //     })
-    //     .collect();
 fn transform_block_to_transfers(blk: ethpb::eth::v2::Block) -> (BlockTimestamp, Vec<transfers::Transfer>) {
     let header = blk.header.as_ref().unwrap();
     let timestamp = BlockTimestamp::from_block(&blk);
@@ -63,14 +32,17 @@ fn transform_block_to_transfers(blk: ethpb::eth::v2::Block) -> (BlockTimestamp, 
         let timestamp = Some(header.timestamp.as_ref().unwrap().clone());
 
         receipt.receipt.logs.iter().flat_map(move |log| {
-            let erc20_transfers = ERC20TransferEvent::match_and_decode(log).map(|event| new_erc20_transfer(
-                hash,
-                log.block_index,
-                log.address.to_vec(),
-                blk.number,
-                timestamp.clone(),
-                event
-            ));
+            let erc20_transfers = Vec::new();
+
+            // TODO: commented out as we don't want to get all erc20s right now
+            // let erc20_transfers = ERC20TransferEvent::match_and_decode(log).map(|event| new_erc20_transfer(
+            //     hash,
+            //     log.block_index,
+            //     log.address.to_vec(),
+            //     blk.number,
+            //     timestamp.clone(),
+            //     event
+            // ));
 
             let erc721_transfers = ERC721TransferEvent::match_and_decode(log).map(|event| new_erc721_transfer(
                 hash,
