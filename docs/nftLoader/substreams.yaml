@@ -5,7 +5,7 @@ package:
 
 protobuf:
   files:
-    - erc721.proto
+    - transfers.proto
   importPaths:
     - ./proto
 
@@ -22,7 +22,7 @@ modules:
     kind: store
     initialBlock: 12287507
     updatePolicy: set_if_not_exists
-    valueType: proto:eth.erc721.v1.Transfer
+    valueType: proto:eth.transfers.v1.Transfer
     inputs:
       - source: sf.ethereum.type.v2.Block
 

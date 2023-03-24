@@ -1,66 +1,269 @@
+// Import the required modules
 mod abi;
-mod block_timestamp;
 mod pb;
+mod block_timestamp;
 
-use self::block_timestamp::BlockTimestamp;
-use rayon::prelude::*; // for parallelizing
-use substreams::store::{
-    self, DeltaProto, StoreNew, StoreSetIfNotExists, StoreSetIfNotExistsProto,
-};
+use pb::transfers;
+use pb::transfers::transfer::Schema;
+use substreams::store::{self, DeltaProto, StoreNew, StoreSetIfNotExists, StoreSetIfNotExistsProto};
 use substreams_database_change::pb::database::{table_change::Operation, DatabaseChanges};
 use substreams_ethereum::pb as ethpb;
 
-use hex_literal::hex;
-use pb::erc721;
+use prost_types::Timestamp;
+use self::block_timestamp::BlockTimestamp;
 use substreams::{log, Hex};
-use substreams_ethereum::{NULL_ADDRESS};
-use lazy_static::lazy_static;
 
-lazy_static! {
-    static ref TRACKED_CONTRACTS: Vec<&'static [u8]> = vec![
-        hex!("bc4ca0eda7647a8ab7c2061c2e118a18a936f13d").as_ref(), // Bored Ape Yacht Club (BAYC)
-        hex!("34d85c9cdeb23fa97cb08333b511ac86e1c4e258").as_ref(), // Otherwise
-        hex!("1792a96E5668ad7C167ab804a100ce42395Ce54D").as_ref(), // Moonbirds
-    ];
-}
+use substreams::scalar::BigInt;
+use substreams_ethereum::Event;
+
+use abi::erc1155::events::TransferBatch as ERC1155TransferBatchEvent;
+use abi::erc1155::events::TransferSingle as ERC1155TransferSingleEvent;
+use abi::erc20::events::Transfer as ERC20TransferEvent;
+use abi::erc721::events::Transfer as ERC721TransferEvent;
 
 substreams_ethereum::init!();
 
-fn transform_block_to_erc721_transfers(blk: ethpb::eth::v2::Block) -> (BlockTimestamp, Vec<erc721::Transfer>) {
-    let timestamp = BlockTimestamp::from_block(&blk);
+ // let timestamp = BlockTimestamp::from_block(&blk);
+    // let header = blk.header.as_ref().unwrap();
+
+    // let transfers: Vec<transfers::Transfer> = (&*TRACKED_CONTRACTS)
+    //     .iter() // non parallel execution primarily due to trying parallel and getting this error
+    //     // substreams encountered an error
+    //     // {"error": "receive stream next message: rpc error: code =
+    //     // Internal desc = error building pipeline: failed setup request: parallel processing run:
+    //     // scheduler run: process job result for target \"store_transfers\": worker ended in error: receiving stream resp:
+    //     // rpc error: code = Internal desc = panic at block #14894146 (980beeda46767b72194cd169cbcd0cb4abbe308d2048571f4068f4c498f2e0e8):
+    //     // cannot Set or Del a value on a state.Builder with an ordinal lower than the previous"}
+    //     // @Gavin: seems like the ordinals in parallel don't work very well as they can be lower than the previous ordinal in a parallel setup
+    //     .flat_map(|&contract_address| {
+    //         blk.events::<abi::erc721::events::Transfer>(&[contract_address]) // Pass a slice of contract addresses
+    //             .map(|(transfer, log)| {
+    //                 substreams::log::info!("NFT Transfer seen");
+
+    //                 transfers::Transfer {
+    //                     block_number: blk.number,
+    //                     from_address: transfer.from,
+    //                     to_address: transfer.to,
+    //                     contract_address: log.address().to_vec(),
+    //                     token_id: transfer.token_id.to_bytes_be().1,
+    //                     tx_hash: log.receipt.transaction.hash.clone(),
+    //                     ordinal: log.block_index() as u64,
+    //                     timestamp: Some(header.timestamp.as_ref().unwrap().clone()),
+    //                 }
+    //             })
+    //             .collect::<Vec<transfers::Transfer>>()
+    //     })
+    //     .collect();
+fn transform_block_to_transfers(blk: ethpb::eth::v2::Block) -> (BlockTimestamp, Vec<transfers::Transfer>) {
     let header = blk.header.as_ref().unwrap();
+    let timestamp = BlockTimestamp::from_block(&blk);
 
-    let transfers: Vec<erc721::Transfer> = (&*TRACKED_CONTRACTS)
-        .par_iter() // Process events in parallel
-        .flat_map(|&contract_address| {
-            blk.events::<abi::erc721::events::Transfer>(&[contract_address]) // Pass a slice of contract addresses
-                .map(|(transfer, log)| {
-                    substreams::log::info!("NFT Transfer seen");
+    let transfers: Vec<transfers::Transfer> = blk.receipts().flat_map(|receipt| {
+        let hash = &receipt.transaction.hash;
+        let timestamp = Some(header.timestamp.as_ref().unwrap().clone());
 
-                    erc721::Transfer {
-                        block_number: blk.number,
-                        from_address: transfer.from,
-                        to_address: transfer.to,
-                        contract_address: log.address().to_vec(),
-                        token_id: transfer.token_id.to_bytes_be().1,
-                        tx_hash: log.receipt.transaction.hash.clone(),
-                        ordinal: log.block_index() as u64,
-                        timestamp: Some(header.timestamp.as_ref().unwrap().clone()),
-                    }
-                })
-                .collect::<Vec<erc721::Transfer>>()
+        receipt.receipt.logs.iter().flat_map(move |log| {
+            let erc20_transfers = ERC20TransferEvent::match_and_decode(log).map(|event| new_erc20_transfer(
+                hash,
+                log.block_index,
+                log.address.to_vec(),
+                blk.number,
+                timestamp.clone(),
+                event
+            ));
+
+            let erc721_transfers = ERC721TransferEvent::match_and_decode(log).map(|event| new_erc721_transfer(
+                hash,
+                log.block_index,
+                log.address.to_vec(),
+                blk.number,
+                timestamp.clone(),
+                event
+            ));
+
+            let erc1155_single_transfers = ERC1155TransferSingleEvent::match_and_decode(log).map(|event| new_erc1155_single_transfer(
+                hash,
+                log.block_index,
+                log.address.to_vec(),
+                blk.number,
+                timestamp.clone(),
+                event
+            ));
+
+            let erc1155_batch_transfers = ERC1155TransferBatchEvent::match_and_decode(log).map(|event| new_erc1155_batch_transfer(
+                hash,
+                log.block_index,
+                log.address.to_vec(),
+                blk.number,
+                timestamp.clone(),
+                event
+            )).into_iter().flatten();
+
+            erc20_transfers
+                .into_iter()
+                .chain(erc721_transfers.into_iter())
+                .chain(erc1155_single_transfers.into_iter())
+                .chain(erc1155_batch_transfers)
         })
-        .collect();
+    }).collect();
 
     (timestamp, transfers)
 }
 
+fn new_erc20_transfer(
+    hash: &[u8],
+    ordinal: u32,
+    contract_address: Vec<u8>,
+    block_number: u64,
+    timestamp: Option<Timestamp>,
+    event: ERC20TransferEvent
+) -> transfers::Transfer {
+    transfers::Transfer {
+        schema: schema_to_string(Schema::Erc20),
+        from_address: event.from,
+        to_address: event.to,
+        quantity: event.value.to_string(),
+        tx_hash: hash.to_vec(),
+        ordinal: ordinal as u64,
+        contract_address: contract_address,
+        block_number: block_number,
+        timestamp: timestamp,
+
+        operator: Vec::new(),
+        token_id: Vec::new(),
+    }
+}
+
+fn new_erc721_transfer(
+    hash: &[u8],
+    ordinal: u32,
+    contract_address: Vec<u8>,
+    block_number: u64,
+    timestamp: Option<Timestamp>,
+    event: ERC721TransferEvent
+) -> transfers::Transfer {
+    transfers::Transfer {
+        schema: schema_to_string(Schema::Erc721),
+        from_address: event.from,
+        to_address: event.to,
+        quantity: "1".to_string(),
+        tx_hash: hash.to_vec(),
+        ordinal: ordinal as u64,
+        token_id: event.token_id.to_bytes_be().1,
+        contract_address: contract_address,
+        block_number: block_number,
+        timestamp: timestamp,
+
+        operator: Vec::new(),
+    }
+}
+
+fn new_erc1155_single_transfer(
+    hash: &[u8],
+    ordinal: u32,
+    contract_address: Vec<u8>, 
+    block_number: u64,
+    timestamp: Option<Timestamp>,
+    event: ERC1155TransferSingleEvent,
+) -> transfers::Transfer {
+    new_erc1155_transfer(
+        hash,
+        ordinal,
+        &event.from,
+        &event.to,
+        &event.id,
+        &event.value,
+        &event.operator,
+        contract_address,
+        block_number,
+        timestamp,
+    )
+}
+
+fn new_erc1155_batch_transfer(
+    hash: &[u8],
+    ordinal: u32,
+    contract_address: Vec<u8>,
+    block_number: u64,
+    timestamp: Option<Timestamp>,
+    event: ERC1155TransferBatchEvent,
+) -> Vec<transfers::Transfer> {
+    if event.ids.len() != event.values.len() {
+        log::info!("There is a different count for ids ({}) and values ({}) in transaction {} for log at block index {}, ERC1155 spec says lenght should match, ignoring the log completely for now",
+            event.ids.len(),
+            event.values.len(),
+            Hex(&hash).to_string(),
+            ordinal,
+        );
+
+        return vec![];
+    }
+
+    event
+        .ids
+        .iter()
+        .enumerate()
+        .map(|(i, id)| {
+            let value = event.values.get(i).unwrap();
+
+            new_erc1155_transfer(
+                hash,
+                ordinal,
+                &event.from,
+                &event.to,
+                id,
+                value,
+                &event.operator,
+                contract_address.clone(),
+                block_number,
+                timestamp.clone(),
+            )
+        })
+        .collect()
+}
+
+fn new_erc1155_transfer(
+    hash: &[u8],
+    ordinal: u32,
+    from: &[u8],
+    to: &[u8],
+    token_id: &BigInt,
+    quantity: &BigInt,
+    operator: &[u8],
+    contract_address: Vec<u8>,
+    block_number: u64,
+    timestamp: Option<Timestamp>,
+) -> transfers::Transfer {
+    transfers::Transfer {
+        schema: schema_to_string(Schema::Erc1155),
+        from_address: from.to_vec(),
+        to_address: to.to_vec(),
+        quantity: quantity.to_string(),
+        tx_hash: hash.to_vec(),
+        ordinal: ordinal as u64,
+        operator: operator.to_vec(),
+        token_id: token_id.to_bytes_be().1,
+        contract_address: contract_address,
+        block_number: block_number,
+        timestamp: timestamp,
+    }
+}
+
+fn schema_to_string(schema: Schema) -> String {
+    match schema {
+        Schema::Erc20 => "erc20",
+        Schema::Erc721 => "erc721",
+        Schema::Erc1155 => "erc1155",
+    }
+    .to_string()
+}
+
 /// Parses block and saves to store
 #[substreams::handlers::store]
-fn store_transfers(blk: ethpb::eth::v2::Block, s: StoreSetIfNotExistsProto<erc721::Transfer>) {
-    let (_timestamp, erc721_transfers) = transform_block_to_erc721_transfers(blk);
+fn store_transfers(blk: ethpb::eth::v2::Block, s: StoreSetIfNotExistsProto<transfers::Transfer>) {
+    let (_timestamp, transfers) = transform_block_to_transfers(blk);
 
-    let unique_key = |transfer: &erc721::Transfer| {
+    let unique_key = |transfer: &transfers::Transfer| {
         format!(
             "{}-{}-{}-{}-{}-{}",
             Hex(&transfer.contract_address),
@@ -72,23 +275,16 @@ fn store_transfers(blk: ethpb::eth::v2::Block, s: StoreSetIfNotExistsProto<erc72
         )
     };
 
-    // for loop over erc721_transfers
-    for transfer in erc721_transfers {
-        if transfer.from_address != NULL_ADDRESS {
-            log::info!("Found a transfer out {}", Hex(&transfer.tx_hash));
-            s.set_if_not_exists(transfer.ordinal, unique_key(&transfer), &transfer);
-        }
-
-        if transfer.to_address != NULL_ADDRESS {
-            log::info!("Found a transfer in {}", Hex(&transfer.tx_hash));
-            s.set_if_not_exists(transfer.ordinal, unique_key(&transfer), &transfer);
-        }
+    // for loop over transfers
+    for transfer in transfers {
+        log::info!("Found a transfer {}", unique_key(&transfer));
+        s.set_if_not_exists(transfer.ordinal, unique_key(&transfer), &transfer);
     }
 }
 
 #[substreams::handlers::map]
 fn db_out(
-    erc_transfer_start: store::Deltas<DeltaProto<erc721::Transfer>>,
+    erc_transfer_start: store::Deltas<DeltaProto<transfers::Transfer>>,
 ) -> Result<DatabaseChanges, substreams::errors::Error> {
     let mut database_changes: DatabaseChanges = Default::default();
     transform_erc721_transfers_to_database_changes(&mut database_changes, erc_transfer_start);
@@ -97,7 +293,7 @@ fn db_out(
 
 fn transform_erc721_transfers_to_database_changes(
     changes: &mut DatabaseChanges,
-    deltas: store::Deltas<DeltaProto<erc721::Transfer>>,
+    deltas: store::Deltas<DeltaProto<transfers::Transfer>>,
 ) {
     use substreams::pb::substreams::store_delta::Operation;
 
@@ -126,7 +322,7 @@ fn push_create(
     changes: &mut DatabaseChanges,
     key: &str,
     ordinal: u64,
-    value: erc721::Transfer,
+    value: transfers::Transfer,
 ) {
     changes
         .push_change("erc721_transfers", key, ordinal, Operation::Create)
@@ -144,8 +340,8 @@ fn push_update(
     changes: &mut DatabaseChanges,
     key: &str,
     ordinal: u64,
-    old_value: erc721::Transfer,
-    new_value: erc721::Transfer,
+    old_value: transfers::Transfer,
+    new_value: transfers::Transfer,
 ) {
     changes
         .push_change("erc721_transfers", key, ordinal, Operation::Update)
