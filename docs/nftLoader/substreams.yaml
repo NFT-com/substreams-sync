@@ -18,20 +18,11 @@ binaries:
     file: target/wasm32-unknown-unknown/release/substreams_postgresql_sink_tutorial.wasm
 
 modules:
-  - name: store_transfers
-    kind: store
-    initialBlock: 12287507
-    updatePolicy: set_if_not_exists
-    valueType: proto:eth.transfers.v1.Transfer
-    inputs:
-      - source: sf.ethereum.type.v2.Block
-
   - name: db_out
     kind: map
-    initialBlock: 12287507
+    initialBlock: 0
     inputs:
-      - store: store_transfers
-        mode: deltas
+      - source: sf.ethereum.type.v2.Block
     output:
       type: proto:sf.substreams.database.v1.DatabaseChanges
 
