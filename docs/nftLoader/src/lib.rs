@@ -22,6 +22,23 @@ use abi::erc721::events::Transfer as ERC721TransferEvent;
 
 substreams_ethereum::init!();
 
+#[substreams::handlers::map]
+fn db_out(
+    blk: ethpb::eth::v2::Block
+) -> Result<DatabaseChanges, substreams::errors::Error> {
+    let (_timestamp, transfers) = transform_block_to_transfers(blk);
+
+    let mut database_changes: DatabaseChanges;
+
+    // for loop over transfers
+    for transfer in transfers {
+        database_changes: DatabaseChanges = Default::default();
+        transform_erc721_transfers_to_database_changes(&mut database_changes, transfer);
+    }
+
+    Ok(database_changes)
+}
+
 fn transform_block_to_transfers(blk: ethpb::eth::v2::Block) -> (BlockTimestamp, Vec<transfers::Transfer>) {
     let header = blk.header.as_ref().unwrap();
     let timestamp = BlockTimestamp::from_block(&blk);
@@ -228,22 +245,6 @@ fn schema_to_string(schema: Schema) -> String {
         Schema::Erc1155 => "erc1155",
     }
     .to_string()
-}
-
-#[substreams::handlers::map]
-fn db_out(
-    blk: ethpb::eth::v2::Block
-) -> Result<DatabaseChanges, substreams::errors::Error> {
-    let (_timestamp, transfers) = transform_block_to_transfers(blk);
-
-    let mut database_changes: DatabaseChanges = Default::default();
-
-    // for loop over transfers
-    for transfer in transfers {
-        transform_erc721_transfers_to_database_changes(&mut database_changes, transfer);
-    }
-
-    Ok(database_changes)
 }
 
 fn transform_erc721_transfers_to_database_changes(
