@@ -28,11 +28,10 @@ fn db_out(
 ) -> Result<DatabaseChanges, substreams::errors::Error> {
     let (_timestamp, transfers) = transform_block_to_transfers(blk);
 
-    let mut database_changes: DatabaseChanges;
+    let mut database_changes: DatabaseChanges = Default::default();
 
     // for loop over transfers
     for transfer in transfers {
-        database_changes: DatabaseChanges = Default::default();
         transform_erc721_transfers_to_database_changes(&mut database_changes, transfer);
     }
 
