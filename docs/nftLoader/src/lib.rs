@@ -3,6 +3,8 @@ mod abi;
 mod pb;
 mod block_timestamp;
 
+use std::fmt::Write;
+use sha2::{Digest, Sha256};
 use pb::transfers;
 use pb::transfers::transfer::Schema;
 use substreams_database_change::pb::database::{table_change::Operation, DatabaseChanges};
@@ -28,13 +30,13 @@ fn db_out(
 ) -> Result<DatabaseChanges, substreams::errors::Error> {
     let (_timestamp, transfers) = transform_block_to_transfers(blk);
 
+    let mut database_changes: DatabaseChanges = Default::default();
+
     // for loop over transfers
     for transfer in transfers {
-        let mut database_changes: DatabaseChanges = Default::default();
-        transform_erc721_transfers_to_database_changes(&mut database_changes, transfer);
+        transform_transfers_to_database_changes(&mut database_changes, transfer);
     }
 
-    let database_changes: DatabaseChanges = Default::default();
     Ok(database_changes)
 }
 
@@ -246,21 +248,32 @@ fn schema_to_string(schema: Schema) -> String {
     .to_string()
 }
 
-fn transform_erc721_transfers_to_database_changes(
+fn transform_transfers_to_database_changes(
     changes: &mut DatabaseChanges,
     transfer: transfers::Transfer,
 ) {
     let unique_key = |transfer: &transfers::Transfer| {
         format!(
-            "{}-{}-{}-{}-{}-{}",
+            "{}-{}-{}-{}-{}-{}-{}-{}-{}",
+            transfer.schema,
             Hex(&transfer.contract_address),
             Hex(&transfer.token_id),
             Hex(&transfer.from_address),
             Hex(&transfer.to_address),
+            Hex(&transfer.operator),
+            Hex(&transfer.quantity),
             Hex(&transfer.tx_hash),
             &transfer.ordinal
         )
     };
+
+    let mut hasher = Sha256::new();
+    hasher.update(unique_key(&transfer).as_bytes());
+    let hash_bytes = hasher.finalize();
+    let mut hash_string = String::new();
+    for byte in hash_bytes {
+        write!(&mut hash_string, "{:02x}", byte).expect("Error writing hash string");
+    }
 
     log::info!("Found a transfer {}", unique_key(&transfer));
 
