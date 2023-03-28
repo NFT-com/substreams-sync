@@ -79,20 +79,20 @@ fn transform_block_to_transfers(blk: ethpb::eth::v2::Block) -> (BlockTimestamp, 
                 event
             ));
 
-            let erc1155_batch_transfers = ERC1155TransferBatchEvent::match_and_decode(log).map(|event| new_erc1155_batch_transfer(
-                hash,
-                log.block_index,
-                log.address.to_vec(),
-                blk.number,
-                timestamp.clone(),
-                event
-            )).into_iter().flatten();
+            // let erc1155_batch_transfers = ERC1155TransferBatchEvent::match_and_decode(log).map(|event| new_erc1155_batch_transfer(
+            //     hash,
+            //     log.block_index,
+            //     log.address.to_vec(),
+            //     blk.number,
+            //     timestamp.clone(),
+            //     event
+            // )).into_iter().flatten();
 
             erc20_transfers
                 .into_iter()
                 .chain(erc721_transfers.into_iter())
                 .chain(erc1155_single_transfers.into_iter())
-                .chain(erc1155_batch_transfers)
+                // .chain(erc1155_batch_transfers)
         })
     }).collect();
 
@@ -170,6 +170,7 @@ fn new_erc1155_single_transfer(
     )
 }
 
+#[allow(dead_code)]
 fn new_erc1155_batch_transfer(
     hash: &[u8],
     ordinal: u32,
