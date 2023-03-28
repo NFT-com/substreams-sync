@@ -193,6 +193,7 @@ fn new_erc1155_batch_transfer(
         .ids
         .iter()
         .enumerate()
+        .filter(|(_, id)| **id != BigInt::from(0)) // Filter out id = 0, which is not a valid token id
         .map(|(i, id)| {
             let value = event.values.get(i).unwrap();
 
