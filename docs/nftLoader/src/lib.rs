@@ -3,6 +3,7 @@ mod abi;
 mod pb;
 mod block_timestamp;
 
+use std::collections::HashSet;
 use std::fmt::Write;
 use sha2::{Digest, Sha256};
 use pb::transfers;
@@ -79,20 +80,20 @@ fn transform_block_to_transfers(blk: ethpb::eth::v2::Block) -> (BlockTimestamp, 
                 event
             ));
 
-            // let erc1155_batch_transfers = ERC1155TransferBatchEvent::match_and_decode(log).map(|event| new_erc1155_batch_transfer(
-            //     hash,
-            //     log.block_index,
-            //     log.address.to_vec(),
-            //     blk.number,
-            //     timestamp.clone(),
-            //     event
-            // )).into_iter().flatten();
+            let erc1155_batch_transfers = ERC1155TransferBatchEvent::match_and_decode(log).map(|event| new_erc1155_batch_transfer(
+                hash,
+                log.block_index,
+                log.address.to_vec(),
+                blk.number,
+                timestamp.clone(),
+                event
+            )).into_iter().flatten();
 
             erc20_transfers
                 .into_iter()
                 .chain(erc721_transfers.into_iter())
                 .chain(erc1155_single_transfers.into_iter())
-                // .chain(erc1155_batch_transfers)
+                .chain(erc1155_batch_transfers)
         })
     }).collect();
 
@@ -170,7 +171,6 @@ fn new_erc1155_single_transfer(
     )
 }
 
-#[allow(dead_code)]
 fn new_erc1155_batch_transfer(
     hash: &[u8],
     ordinal: u32,
@@ -190,15 +190,28 @@ fn new_erc1155_batch_transfer(
         return vec![];
     }
 
+    let mut seen_pairs: HashSet<String> = HashSet::new();
+
     event
         .ids
         .iter()
         .enumerate()
-        .filter(|(_, id)| **id != BigInt::from(0)) // Filter out id = 0, which is not a valid token id
         .map(|(i, id)| {
             let value = event.values.get(i).unwrap();
 
-            new_erc1155_transfer(
+            let pair_str = format!("{}|{}", id, value);
+            if seen_pairs.contains(&pair_str) {
+                log::info!(
+                    "Skipping duplicate transfer for token id {} and value {}",
+                    id,
+                    value
+                );
+                return None;
+            } else {
+                seen_pairs.insert(pair_str);
+            }
+
+            Some(new_erc1155_transfer(
                 hash,
                 ordinal,
                 &event.from,
@@ -209,8 +222,10 @@ fn new_erc1155_batch_transfer(
                 contract_address.clone(),
                 block_number,
                 timestamp.clone(),
-            )
+            ))
         })
+        .filter(|opt| opt.is_some())
+        .map(|opt| opt.unwrap())
         .collect()
 }
 
