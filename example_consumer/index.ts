@@ -13,8 +13,14 @@ client.query('LISTEN transfers');
 console.log('Waiting for new inserts...');
 
 client.on('notification', (msg: any) => {
-  console.log(`Received notification: ${msg.channel}`);
   const [schema, blockNumber, tokenId, contractAddress, quantity, fromAddress, toAddress, txHash, timestamp] = msg.payload.split("|");
 
-  console.log(`${schema} found at block ${blockNumber}, contract=${contractAddress}, tokenId=${tokenId}, from=${fromAddress}, to=${toAddress}, ${quantity > 1 ? `quantity=${quantity}, ` : ''}txHash=${txHash}, timestamp=${timestamp}`)
+  const returnString = `${schema} found at block ${blockNumber}, contract=${contractAddress}, tokenId=${tokenId}, from=${fromAddress}, to=${toAddress}, ${quantity > 1 ? `quantity=${quantity}, ` : ''}txHash=${txHash}, timestamp=${timestamp}`;
+  if (fromAddress == '0000000000000000000000000000000000000000') {
+    console.log(`[MINT]: ${returnString}`);
+  } else if (toAddress == '0000000000000000000000000000000000000000') {
+    console.log(`[BURN]: ${returnString}`);
+  } else {
+    console.log(`[TRANSFER]: ${returnString}`);
+  }
 });
