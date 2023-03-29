@@ -1,2 +1,4 @@
 .idea
 .DS_Store
+example_consumer/node_modules
+example_consumer/package-lock.json
