@@ -15,12 +15,11 @@ console.log('Waiting for new inserts...');
 client.on('notification', (msg: any) => {
   const [schema, blockNumber, tokenId, contractAddress, quantity, fromAddress, toAddress, txHash, timestamp] = msg.payload.split("|");
 
-  const returnString = `${schema} found at block ${blockNumber}, contract=${contractAddress}, tokenId=${tokenId}, from=${fromAddress}, to=${toAddress}, ${quantity > 1 ? `quantity=${quantity}, ` : ''}txHash=${txHash}, timestamp=${timestamp}`;
   if (fromAddress == '0000000000000000000000000000000000000000') {
-    console.log(`[MINT]: ${returnString}`);
+    console.log(`[MINTED (${blockNumber})]: ${contractAddress}/${tokenId} to ${toAddress}, ${quantity > 1 ? `quantity=${quantity}, ` : ''}`);
   } else if (toAddress == '0000000000000000000000000000000000000000') {
-    console.log(`[BURN]: ${returnString}`);
+    console.log(`[BURNED] (${blockNumber}): ${contractAddress}/${tokenId} from ${fromAddress}, ${quantity > 1 ? `quantity=${quantity}, ` : ''}`);
   } else {
-    console.log(`[TRANSFER]: ${returnString}`);
+    console.log(`[TRANSFERRED (${blockNumber})]: ${contractAddress}/${tokenId} from ${fromAddress} to ${toAddress}, ${quantity > 1 ? `quantity=${quantity}, ` : ''}`);
   }
 });
