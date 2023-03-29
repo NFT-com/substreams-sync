@@ -16,10 +16,10 @@ client.on('notification', (msg: any) => {
   const [schema, blockNumber, tokenId, contractAddress, quantity, fromAddress, toAddress, txHash, timestamp] = msg.payload.split("|");
 
   if (fromAddress == '0000000000000000000000000000000000000000') {
-    console.log(`[MINTED (${blockNumber})]: ${contractAddress}/${tokenId} to ${toAddress}, ${quantity > 1 ? `quantity=${quantity}, ` : ''}`);
+    console.log(`[MINTED]: ${schema}/${contractAddress}/${tokenId} to ${toAddress}, ${quantity > 1 ? `quantity=${quantity}, ` : ''}`);
   } else if (toAddress == '0000000000000000000000000000000000000000') {
-    console.log(`[BURNED] (${blockNumber}): ${contractAddress}/${tokenId} from ${fromAddress}, ${quantity > 1 ? `quantity=${quantity}, ` : ''}`);
+    console.log(`[BURNED]: ${schema}/${contractAddress}/${tokenId} from ${fromAddress}, ${quantity > 1 ? `quantity=${quantity}, ` : ''}`);
   } else {
-    console.log(`[TRANSFERRED (${blockNumber})]: ${contractAddress}/${tokenId} from ${fromAddress} to ${toAddress}, ${quantity > 1 ? `quantity=${quantity}, ` : ''}`);
+    console.log(`[TRANSFERRED]: ${schema}/${contractAddress}/${tokenId} from ${fromAddress} to ${toAddress}, ${quantity > 1 ? `quantity=${quantity}, ` : ''}`);
   }
 });
