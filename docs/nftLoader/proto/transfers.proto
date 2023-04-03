@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package eth.transfers.v1;
+
+import "google/protobuf/timestamp.proto";
+
+message Transfers {
+  repeated Transfer transfers = 1;
+}
+
+message Transfer {
+  enum Schema {
+    erc20 = 0;
+    erc721 = 1;
+    erc1155 = 2;
+  }
+
+  // Schema is the string representation of one of the enum defined in Schema. We use it as a String
+  // here because Rust code uses a `u32` for its representation but it's nicer for the file format
+  // to have the type as a string.
+  string schema = 1;
+
+  uint64 block_number = 2;
+
+  // The person that received the transfer, might not be the same as the one that did initiated the
+  // transaction.
+  bytes from_address = 3;
+
+  // The person that received the transfer.
+  bytes to_address = 4;
+
+  // Operator is the "sender" of the actual transaction that initiated the transfer, it's equal to
+  // `msg.sender` within the smart contract. This will be different than `from` in case of `Approval`
+  // for example. Only available if `schema = ERC1155`, for `ERC20` and `ERC721`, this will be the empty
+  // string "".
+  bytes operator = 5;
+
+  // How many token were transferred in this transfer, will always be 1 in the case of ERC721.
+  string quantity = 6;
+
+  // TokenID the identifier of the token for which the transfer is happening. Only
+  // available when `schema = ERC721` or `schema = ERC1155`. When `schema = ERC20`, the token id
+  // will be empty string "" as the contract itself is the token identifier.
+  bytes token_id = 7;
+
+  // ContractAddress is the address of the smart contract that is the token contract.
+  bytes contract_address = 8;
+
+  // TxHash is the hash of the transaction
+  bytes tx_hash = 9;
+
+  // Ordinal is the order of the transfer within the block.
+  uint64 ordinal = 10;
+
+  // Timestamp is the timestamp of the block.
+  google.protobuf.Timestamp timestamp = 11;
+}

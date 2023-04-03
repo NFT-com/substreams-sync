@@ -19,7 +19,7 @@ This is a command line tool to quickly sync a Substreams with a PostgreSQL datab
 1. Run the setup command:
 
     ```bash
-    substreams-sink-postgres setup "psql://dev-node:insecure-change-me-in-prod@localhost:5432/dev-node?sslmode=disable" docs/tutorial/schema.sql
+    substreams-sink-postgres setup "psql://dev-node:insecure-change-me-in-prod@localhost:5432/dev-node?sslmode=disable" docs/nftLoader/schema.sql
     ```
 
     This will connect to the given database pointed by `psql://dev-node:insecure-change-me-in-prod@localhost:5432/dev-node?sslmode=disable`, create the tables and indexes specified in the given `<schema_file>`, and will create the required tables to run the sink (e.g. the `cursors` table).
@@ -28,10 +28,10 @@ This is a command line tool to quickly sync a Substreams with a PostgreSQL datab
 
 1. Run the sink
 
-    Compile the [Substreams](./docs/tutorial/substreams.yaml) tutorial project first:
+    Compile the [Substreams](./docs/nftLoader/substreams.yaml) tutorial project first:
 
     ```bash
-    cd docs/tutorial
+    cd docs/nftLoader
     cargo build --target wasm32-unknown-unknown --release
     cd ../..
     ```
@@ -42,7 +42,7 @@ This is a command line tool to quickly sync a Substreams with a PostgreSQL datab
     substreams-sink-postgres run \
         "psql://dev-node:insecure-change-me-in-prod@localhost:5432/dev-node?sslmode=disable" \
         "mainnet.eth.streamingfast.io:443" \
-        "./docs/tutorial/substreams.yaml" \
+        "./docs/nftLoader/substreams.yaml" \
         db_out
     ```
 
@@ -64,3 +64,7 @@ psql://<user>:<password>@<host>/<dbname>[?<options>]
 Where `<options>` is URL query parameters in `<key>=<value>` format, multiple options are separated by `&` signs. Supported options can be seen [on libpq official documentation](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-PARAMKEYWORDS). The options `<user>`, `<password>`, `<host>` and `<dbname>` should **not** be passed in `<options>` as they are automatically extracted from the DSN URL.
 
 Moreover, the `schema` option key can be used to select a particular schema within the `<dbname>` database.
+
+### Authentication
+export STREAMINGFAST_KEY=${INSERT_KEY}
+export SUBSTREAMS_API_TOKEN=$(curl https://auth.dfuse.io/v1/auth/issue -s --data-binary '{"api_key":"'$STREAMINGFAST_KEY'"}' | jq -r .token)
